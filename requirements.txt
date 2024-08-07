@@ -1,0 +1,6 @@
+selenium
+pyyaml
+bs4
+pyyaml
+jieba
+openpyxl
