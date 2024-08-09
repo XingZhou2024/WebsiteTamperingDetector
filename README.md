@@ -20,28 +20,28 @@
 ## 支持检测的篡改特征
 
 - UA判定型JS代码
-1. ![image](images/UA-1.png)
-2. ![image](images/UA-2.png)
-3. ![image](images/UA-3.png)
-4. ![image](images/UA-4.png)
-5. ![image](images/UA-5.png)
-6. ![image](images/UA-6.png)
+1. 类型一<br>![image](images/UA-1.png)
+2. 类型二<br>![image](images/UA-2.png)
+3. 类型三<br>![image](images/UA-3.png)
+4. 类型四<br>![image](images/UA-4.png)
+5. 类型五<br>![image](images/UA-5.png)
+6. 类型六<br>![image](images/UA-6.png)
 
 - 代码混淆型JS代码
-1. ![image](images/JS-1.png)
-2. ![image](images/JS-2.png)
-3. ![image](images/JS-3.png)
-4. ![image](images/JS-4.png)
-5. ![image](images/JS-5.png)
-6. ![image](images/JS-6.png)
-7. ![image](images/JS-7.png)
-8. ![image](images/JS-8.png)
+1. 类型一<br>![image](images/JS-1.png)
+2. 类型二<br>![image](images/JS-2.png)
+3. 类型三<br>![image](images/JS-3.png)
+4. 类型四<br>![image](images/JS-4.png)
+5. 类型五<br>![image](images/JS-5.png)
+6. 类型六<br>![image](images/JS-6.png)
+7. 类型七<br>![image](images/JS-7.png)
+8. 类型八<br>![image](images/JS-8.png)
 
 - 特定结构HTML代码
-1. ![image](images/HTML-1.png)
-2. ![image](images/HTML-2.png)
-3. ![image](images/HTML-3.png)
-4. ![image](images/HTML-4.png)
+1. 类型一<br>![image](images/HTML-1.png)
+2. 类型二<br>![image](images/HTML-2.png)
+3. 类型三<br>![image](images/HTML-3.png)
+4. 类型四<br>![image](images/HTML-4.png)
 
 ## 准确率
 
