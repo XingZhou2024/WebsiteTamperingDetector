@@ -15,10 +15,10 @@ pattern_list_ua = [
     re.compile(r'<script[^>]*>[^<>]+navigator\.useragent\.tolowercase\(\).+document\.title[^<>]+</script>'),
 ]
 
-# JS植入型代码特征
+# JS混淆型代码特征
 pattern_list_js = [
     re.compile(r'<script[^>]*>.*parseint\(.+\).+string\.fromcharcode\([^()]+\).+tostring\([^()]+\).+regexp.+(?=.*javascript)(?=.*window)(?=.*document)(?=.*write).*</script>'),
-    re.compile(r'<script[^>]*>[^<>]*eval.+parseint\(.+\).+string\.fromcharcode\([^()]+\).+tostring\([^()]+\).+regexp.+31,31[^<>]+</script>', re.DOTALL),
+    re.compile(r'<script[^>]*>\s*eval\(function.+parseint.+string\.fromcharcode.+tostring.+replace.+regexp.+window[^<>]+split[^<>]+</script>', re.DOTALL),
     re.compile(r'<script[^>]*>\s*var.+=\s*string\.fromcharcode\([^()]+\)\s*;\s*document\.write\([^()]+\)[^<>]+</script>', re.DOTALL),
     re.compile(r'''<script[^>]*>.*window\s*\["\x64\x6f\x63\x75\x6d\x65\x6e\x74"\]\['\x77\x72\x69\x74\x65'\].+</script>''', re.DOTALL),
     re.compile(r'''<script[^>]*>\s*\['sojson\.[^']+'\].*</script>''', re.DOTALL),
@@ -102,7 +102,7 @@ def detect(queue_data, config):
 
         html_content = filter_long_lines(content, 10000).lower()
 
-        # 判断是否存在JS植入型代码
+        # 判断是否存在JS混淆型代码
         for pattern in pattern_list_js:
             search_result = pattern.search(html_content)
             if search_result:
@@ -153,7 +153,7 @@ def detect(queue_data, config):
             keywords_similarity = calculate_similarity(tampering_keywords, keywords_other)
 
         # 判断存在网站篡改的条件：
-        # 1.存在JS植入型代码
+        # 1.存在JS混淆型代码
         # 2.存在UA判定型代码且meta信息符合关键词匹配条件
         # 3.body中特定HTML结构文本符合关键词匹配条件
         # 4.关键词匹配率达到独立判定阈值且与其他文本的相似度低于阈值
