@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import jieba
 import socket
@@ -6,6 +7,10 @@ import requests
 import ipaddress
 from collections import Counter
 from openpyxl import Workbook
+
+ip_pattern = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
+ip_port_pattern = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$")
+domain_port_pattern = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}:\d+$")
 
 
 def download_china_mainland_data(file_path, ip_data_url):
@@ -45,7 +50,24 @@ def is_china_mainland_ip(ip, cn_ip_ranges):
 
 
 def resolve_domain(domain, max_retries=3, timeout=3):
-    """解析域名的IP地址"""
+    """解析域名的IP地址，如果输入的域名是IP、IP:端口或域名:端口形式的，则正确解析IP"""
+
+    # 检查是否为纯 IP 地址
+    if ip_pattern.match(domain):
+        # 直接返回 IP 地址
+        return domain
+
+    # 检查是否为 IP:端口 的格式
+    if ip_port_pattern.match(domain):
+        # 提取并返回 IP 部分
+        return domain.split(':')[0]
+
+    # 检查是否为 域名:端口 的格式
+    if domain_port_pattern.match(domain):
+        # 提取并保留域名部分（去掉端口）
+        domain = domain.split(':')[0]
+
+    # 否则，进行域名解析
     retries = 0
     while retries < max_retries:
         try:
