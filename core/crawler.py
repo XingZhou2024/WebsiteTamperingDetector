@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
+from selenium.common.exceptions import UnexpectedAlertPresentException, NoAlertPresentException
 from core.utils import *
 
 
@@ -64,6 +65,17 @@ class Crawler:
             }
 
             return data
+
+        except UnexpectedAlertPresentException:
+            try:
+                alert = driver.switch_to.alert
+                alert_text = alert.text
+                logger.info(f"Alert text：{alert_text}")
+                alert.accept()  # 关闭弹窗
+
+            except NoAlertPresentException:
+                pass  # 如果没有弹窗，继续执行
+
         except Exception as e:
             logger.error(f"{domain} crawler failed for {e}")
 
