@@ -25,6 +25,7 @@ pattern_list_js = [
     re.compile(r'<script[^>]*>\s*eval.+string\.fromcharcode.+charcodeat\([^()]+\).+</script>'),
     re.compile(r'<script[^>]*>[^<>]+function.+math\.random.+charat.+document.createelement.+appendchild[^<>]+</script>'),
     re.compile(r'<script[^>]*>[^<>]+var.+jsjiami\.com.+</script>'),
+    re.compile(r'<script[^>]*>.*eval\(.+\).+tostring\([^()]+\).+replace.+regexp.+(?=.*script)(?=.*js)(?=.*document)(?=.*write).*</script>'),
 ]
 
 logger = logging.getLogger(__name__)
