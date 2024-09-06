@@ -9,13 +9,14 @@ from core.webdriver_pool import WebDriverPool
 
 def main():
     # 设置日志记录
-    setup_logging()
+    config_path = 'config.yaml'
+    setup_logging(config_path)
     logger = logging.getLogger(__name__)
 
     logger.info("Starting Website Tampering Detector...")
 
     # 读取配置文件
-    with open('config.yaml', 'r') as f:
+    with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
 
     file_input = config["file_input"]

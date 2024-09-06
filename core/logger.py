@@ -4,7 +4,7 @@ import logging
 import logging.handlers
 
 
-def setup_logging(config_path='config.yaml'):
+def setup_logging(config_path):
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
 
@@ -33,5 +33,4 @@ def setup_logging(config_path='config.yaml'):
     # 将处理器添加到日志记录器
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
-
 
