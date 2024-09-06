@@ -36,6 +36,7 @@
 6. 类型六<br>![image](images/JS-6.png)
 7. 类型七<br>![image](images/JS-7.png)
 8. 类型八<br>![image](images/JS-8.png)
+9. 类型九<br>![image](images/JS-9.png)
 
 - 特定结构HTML代码
 1. 类型一<br>![image](images/HTML-1.png)
