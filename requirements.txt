@@ -3,3 +3,4 @@ pyyaml
 bs4
 jieba
 openpyxl
+requests
