@@ -20,7 +20,7 @@ pattern_list_js = [
     re.compile(r'<script[^>]*>.*parseint\(.+\).+string\.fromcharcode\([^()]+\).+tostring\([^()]+\).+regexp.+(?=.*javascript)(?=.*window)(?=.*document)(?=.*write).*</script>'),
     re.compile(r'<script[^>]*>\s*eval\(function.+parseint.+string\.fromcharcode.+tostring.+replace.+regexp.+window[^<>]+split[^<>]+</script>', re.DOTALL),
     re.compile(r'<script[^>]*>\s*var.+=\s*string\.fromcharcode\([^()]+\)\s*;\s*document\.write\([^()]+\)[^<>]+</script>', re.DOTALL),
-    re.compile(r'''<script[^>]*>.*window\s*\["\x64\x6f\x63\x75\x6d\x65\x6e\x74"\]\['\x77\x72\x69\x74\x65'\].+</script>''', re.DOTALL),
+    re.compile(r'''<script[^>]*>[^<>]*window\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\(\s*(['"](\\x[0-9a-f]{2})+['"])\s*\)[^<>]*</script>''', re.DOTALL),
     re.compile(r'''<script[^>]*>\s*\['sojson\.[^']+'\].*</script>''', re.DOTALL),
     re.compile(r'<script[^>]*>\s*eval.+string\.fromcharcode.+charcodeat\([^()]+\).+</script>'),
     re.compile(r'<script[^>]*>[^<>]+function.+math\.random.+charat.+document.createelement.+appendchild[^<>]+</script>'),
