@@ -3,10 +3,17 @@ import re
 import time
 import jieba
 import socket
-import requests
 import ipaddress
+import requests
+import tldextract
 from collections import Counter
 from openpyxl import Workbook
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+from requests.exceptions import RequestException
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
 
 ip_pattern = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
 ip_port_pattern = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$")
@@ -163,4 +170,160 @@ def calculate_similarity(list1, list2):
     union = min(len(set1), len(set2))
     similarity = round(intersection / union if union else 0, 2)
     return similarity
+
+
+def extract_js_urls(html_content, domain):
+    """从HTML中提取所有JS文件的URL，并处理不完整的URL和省略协议的URL"""
+
+    # 解析HTML内容
+    soup = BeautifulSoup(html_content, 'lxml')
+    js_urls = []
+
+    # 提取所有的<script>标签
+    scripts = soup.find_all('script', src=True)
+
+    for script in scripts:
+        js_url = script['src']
+
+        # 如果URL以 // 开头，补全为 http://
+        if js_url.startswith('//'):
+            js_url = 'http:' + js_url
+        # 如果URL是相对路径，拼接域名
+        elif not js_url.startswith(('http://', 'https://')):
+            js_url = urljoin(f'http://{domain}', js_url)
+
+        js_urls.append(js_url)
+
+    return js_urls
+
+
+def fetch_js_content(url, max_retries=3, timeout=5):
+    """请求JS文件的URL以获取其内容"""
+    retries = 0
+    while retries < max_retries:
+        try:
+            response = requests.get(url, timeout=timeout)
+
+            if response.status_code == 200:
+                return response.text
+
+        except RequestException:
+            pass
+
+        retries += 1
+        time.sleep(1)
+
+    return None
+
+
+def get_main_domain(url_or_domain):
+    """提取URL或域名的主域名"""
+    # 使用tldextract来分解域名或URL
+    extracted = tldextract.extract(url_or_domain)
+    # 组合主域名和顶级域名
+    return f"{extracted.domain}.{extracted.suffix}"
+
+
+def compare_main_domains(url_or_domain1, url_or_domain2):
+    """比较两个URL或域名的主域名是否一致"""
+    main_domain1 = get_main_domain(url_or_domain1)
+    main_domain2 = get_main_domain(url_or_domain2)
+    return main_domain1 == main_domain2
+
+
+def extract_text_from_html(html_content, text_separator=' '):
+    """从HTML内容中提取所有文本，包括title、keywords和description"""
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    # 提取title
+    title_tags = soup.find_all('title')
+    title = text_separator.join(
+        [title_tag.get_text(separator=text_separator, strip=True) for title_tag in title_tags]).strip()
+
+    # 提取keywords
+    keywords_tag = soup.find('meta', attrs={'name': 'keywords'})
+    keywords = keywords_tag['content'].strip() if keywords_tag and 'content' in keywords_tag.attrs else ''
+
+    # 提取description
+    description_tag = soup.find('meta', attrs={'name': 'description'})
+    description = description_tag['content'].strip() if description_tag and 'content' in description_tag.attrs else ''
+
+    # 提取页面正文文本
+    body_text = soup.get_text(separator=text_separator, strip=True)
+
+    # 查找所有设置为hidden的元素
+    hidden_elements = soup.find_all(
+        lambda tag: tag.has_attr('hidden')
+        or ('style' in tag.attrs and 'display:none' in tag['style'].replace(' ', '')))
+
+    # 提取hidden元素中的文本
+    hidden_texts = text_separator.join(
+        [element.get_text(separator=text_separator, strip=True) for element in hidden_elements])
+
+    # 合并所有文本内容
+    combined_text = text_separator.join(filter(None, [title, keywords, description, body_text, hidden_texts]))
+
+    return combined_text
+
+
+def compute_similarity(text1, text2):
+    """计算两段文本内容的相似程度"""
+
+    if not text1 or not text2:
+        return 0
+
+    # 使用 jieba 分词
+    text1_tokenized = ' '.join(jieba.lcut(text1))
+    text2_tokenized = ' '.join(jieba.lcut(text2))
+
+    if not text1_tokenized.strip() or not text2_tokenized.strip():
+        return 0
+
+    try:
+        # 使用TF-IDF向量化文本
+        vectorizer = TfidfVectorizer(stop_words=None)
+        tfidf_matrix = vectorizer.fit_transform([text1_tokenized, text2_tokenized])
+
+        # 计算Cosine相似度
+        similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])
+    except Exception:
+        return 0
+
+    return round(similarity[0][0], 2)
+
+
+def partial_match(pattern, text, max_length=20000, slice_length=10000):
+    """
+    如果字符串长度超过一定长度，则针对字符串的开头和结尾进行正则表达式匹配，避免直接对超长文本进行匹配，导致耗时过长。
+
+    参数:
+    - pattern: 正则表达式的模式。
+    - text: 需要匹配的字符串。
+    - max_length: 如果字符串长度超过该值，则只对开头和结尾进行匹配。默认值为20000。
+    - slice_length: 匹配开头和结尾部分的子字符串长度。默认值为10000。
+
+    返回:
+    - search_result: 匹配结果。
+    """
+    if len(text) > max_length:
+        # 提取字符串的开头和结尾部分
+        start_text = text[:slice_length]
+        end_text = text[-slice_length:]
+        # 对开头和结尾进行匹配
+        search_result = pattern.search(start_text)
+        if not search_result:
+            search_result = pattern.search(end_text)
+    else:
+        # 如果长度不超过 max_length，对整个字符串进行匹配
+        search_result = re.findall(pattern, text)
+
+    return search_result
+
+
+def remove_control_characters(value):
+    """移除字符串中的控制字符"""
+    if isinstance(value, str):
+        # 仅保留常见的字符（Unicode 码点大于等于32）
+        return re.sub(r'[\x00-\x1F\x7F-\x9F]', '', value)
+    return value
 

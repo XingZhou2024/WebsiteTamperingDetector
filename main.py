@@ -1,3 +1,5 @@
+import os.path
+
 import yaml
 import logging
 import multiprocessing
@@ -19,6 +21,10 @@ def main():
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
 
+    # 创建文件下载临时目录
+    if not os.path.exists('tmp'):
+        os.mkdir('tmp')
+
     file_input = config["file_input"]
     num_crawler_processes = config["num_crawler_processes"]
 
@@ -32,7 +38,7 @@ def main():
     check_process.start()
 
     # 创建WebDriver实例池
-    webdriver_pool = WebDriverPool(config)
+    webdriver_pool = WebDriverPool(config, min(config.get("num_crawler_processes"), len(domains)))
 
     # 启动爬取线程池
     crawler_pool = CrawlerPool(num_crawler_processes, config, webdriver_pool)

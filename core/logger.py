@@ -18,7 +18,7 @@ def setup_logging(config_path):
     logger.setLevel(logging.INFO)
 
     # 创建文件处理器
-    file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=10485760, backupCount=3)
+    file_handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=10485760, backupCount=10)
     file_handler.setLevel(logging.INFO)
 
     # 创建控制台处理器
@@ -32,5 +32,5 @@ def setup_logging(config_path):
 
     # 将处理器添加到日志记录器
     logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+    #logger.addHandler(console_handler)
 

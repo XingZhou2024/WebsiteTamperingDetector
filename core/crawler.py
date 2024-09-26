@@ -1,11 +1,11 @@
-import socket
+import json
 import threading
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
-from selenium.common.exceptions import UnexpectedAlertPresentException, NoAlertPresentException
+from selenium.common.exceptions import UnexpectedAlertPresentException, NoAlertPresentException, TimeoutException, InvalidSessionIdException
 from core.utils import *
 
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class Crawler:
     def __init__(self, config, webdriver_pool):
-        self.max_wait_time = config.get("max_wait_time")
+        self.body_wait_time = config.get("body_wait_time")
         self.num_crawler_processes = config.get("num_crawler_processes")
         self.config = config
         self.webdriver_pool = webdriver_pool
@@ -22,6 +22,23 @@ class Crawler:
     def crawler(self, domain):
         logger.info(f'Start crawler {domain}')
         driver = self.webdriver_pool.get_driver()
+        driver_mobile = self.webdriver_pool.get_driver_mobile()
+
+        # 爬虫结果数据
+        data = {
+            "domain": domain,  # 原始域名
+            "is_crawler_success": False,  # 是否爬取成功
+            "full_domain": '',  # 访问网站时的完整域名
+            "final_url": '',  # 访问网站时最终跳转的URL
+            "ip_address": '',  # 网站域名的IP地址
+            "content": '',  # 网站首页内容
+            "content_mobile": '',  # 以移动端UA打开网站首页的内容
+            "final_url_mobile": '',  # 以移动端UA打开网站时最终的URL
+            "js_file_list": []  # 访问网站首页时的JS加载列表
+        }
+
+        create_new_driver = False
+
         try:
             full_domain = domain
             ip_address = resolve_domain(full_domain)
@@ -32,66 +49,131 @@ class Crawler:
             if not ip_address:
                 logger.error(f'{domain} crawler failed for IP resolution.')
                 # 返回爬取失败结果
-                data = {
-                    "domain": domain,
-                    "is_crawler_success": False,
-                    "full_domain": '',
-                    "final_url": '',
-                    "ip_address": '',
-                    "content": ''
-                }
-
                 return data
 
-            driver.get(f'http://{full_domain}')
+            try:
+                # 以PC端的UA爬取页面
+                driver.get(f'http://{full_domain}')
+            #  处理出现弹窗的情况
+            except UnexpectedAlertPresentException:
+                try:
+                    alert = driver_mobile.switch_to.alert
+                    alert_text = alert.text
+                    logger.info(f"Alert text：{alert_text}")
+                    alert.accept()  # 关闭弹窗
+
+                except NoAlertPresentException:
+                    pass  # 如果没有弹窗，继续执行
+            except TimeoutException as e:
+                # if 'Timed out receiving message from renderer' in str(e):
+                #     # 若出现此类错误则重新创建一个webdriver实例
+                #     create_new_driver = True
+                #     logger.info(f'Restart webdriver for {str(e)}')
+                pass
 
             # 等待页面加载完成
-            WebDriverWait(driver, self.max_wait_time).until(
+            WebDriverWait(driver, self.body_wait_time).until(
                 expected_conditions.presence_of_element_located((By.TAG_NAME, 'body'))
             )
+
+            # 获取页面性能数据
+            performance_timing = driver.execute_script("return window.performance.timing")
+
+            # 计算页面加载时间
+            navigation_start = performance_timing['navigationStart']
+            load_event_end = performance_timing['loadEventEnd']
+
+            load_time_ms = load_event_end - navigation_start
+            load_time_sec = load_time_ms / 1000
+
+            logger.info(f'Crawler {domain} with host UA, load time {load_time_sec:.2f}')
+
+            # 获取 JavaScript 文件内容
+            logs = driver.get_log('performance')
+            for log in logs:
+                log_entry = json.loads(log['message'])
+                message = log_entry['message']
+                if message['method'] == 'Network.requestWillBeSent':
+                    request_url = message['params']['request']['url']
+                    if not request_url.endswith('.js'):
+                        continue
+                    request_id = message['params']['requestId']
+                    try:
+                        response_body = driver.execute_cdp_cmd('Network.getResponseBody', {'requestId': request_id})
+                        logger.debug(f"{domain} {request_url} {response_body['body'][:500]}")
+                        data["js_file_list"].append((request_url, response_body['body']))
+                    except:
+                        pass
 
             # 爬取页面内容
             content = driver.page_source
             final_url = driver.current_url
 
+            try:
+                # 以移动端的UA爬取页面
+                driver_mobile.get(f'http://{full_domain}')
+            #  处理出现弹窗的情况
+            except UnexpectedAlertPresentException:
+                try:
+                    alert = driver_mobile.switch_to.alert
+                    alert_text = alert.text
+                    logger.info(f"Alert text：{alert_text}")
+                    alert.accept()  # 关闭弹窗
+
+                except NoAlertPresentException:
+                    pass  # 如果没有弹窗，继续执行
+            except TimeoutException as e:
+                # if 'Timed out receiving message from renderer' in str(e):
+                #     # 若出现此类错误则重新创建一个webdriver实例
+                #     create_new_driver = True
+                #     logger.info(f'Restart webdriver for {str(e)}')
+                pass
+
+            # 等待页面加载完成
+            WebDriverWait(driver_mobile, self.body_wait_time).until(
+                expected_conditions.presence_of_element_located((By.TAG_NAME, 'body'))
+            )
+
+            # 获取页面性能数据
+            performance_timing = driver_mobile.execute_script("return window.performance.timing")
+
+            # 计算页面加载时间
+            navigation_start = performance_timing['navigationStart']
+            load_event_end = performance_timing['loadEventEnd']
+
+            load_time_ms = load_event_end - navigation_start
+            load_time_sec = load_time_ms / 1000
+
+            logger.info(f'Crawler {domain} with mobile UA, load time {load_time_sec:.2f}')
+
+            # 爬取页面内容
+            content_mobile = driver_mobile.page_source
+            final_url_mobile = driver_mobile.current_url
+
             # 生成数据结构
-            data = {
-                "domain": domain,
-                "is_crawler_success": True,
-                "full_domain": full_domain,
-                "final_url": final_url,
-                "ip_address": ip_address,
-                "content": content
-            }
+            data["is_crawler_success"] = True
+            data["full_domain"] = full_domain
+            data["final_url"] = final_url
+            data["ip_address"] = ip_address
+            data["content"] = content
+            data["content_mobile"] = content_mobile
+            data["final_url_mobile"] = final_url_mobile
 
             return data
 
-        except UnexpectedAlertPresentException:
-            try:
-                alert = driver.switch_to.alert
-                alert_text = alert.text
-                logger.info(f"Alert text：{alert_text}")
-                alert.accept()  # 关闭弹窗
-
-            except NoAlertPresentException:
-                pass  # 如果没有弹窗，继续执行
+        except InvalidSessionIdException as e:
+            # 若出现此类错误则重新创建一个webdriver实例
+            create_new_driver = True
+            logger.info(f'Restart webdriver for {e}')
 
         except Exception as e:
             logger.error(f"{domain} crawler failed for {e}")
 
             # 返回爬取失败结果
-            data = {
-                "domain": domain,
-                "is_crawler_success": False,
-                "full_domain": '',
-                "final_url": '',
-                "ip_address": '',
-                "content": ''
-            }
-
             return data
         finally:
-            self.webdriver_pool.return_driver(driver)
+            self.webdriver_pool.return_driver(driver, create_new_driver)
+            self.webdriver_pool.return_driver_mobile(driver_mobile, create_new_driver)
 
 
 class CrawlerPool:

@@ -1,31 +1,59 @@
-import re
 import logging
 from bs4 import BeautifulSoup
 from core.utils import *
 
 
+# # UA判定型代码正则
+# pattern_list_ua = [
+#     re.compile(r'<script[^>]*>[^<>]+navigator\.useragent\.tolocalelowercase\(\)\.indexof.+document\.title[^<>]+</script>'),
+#     re.compile(r'<script[^>]*>[^<>]+navigator\.useragent\.match\([^()]+\).+document\.title[^<>]+</script>'),
+#     re.compile(r'<script[^>]*>[^<>]+navigator\.useragent\.tolocalelowercase\(\).+document\.title[^<>]+</script>', re.DOTALL),
+#     re.compile(r'<script[^>]*>[^<>]+window\.location\.tostring\(\).indexof\([^()]+\).+window\.location\.href[^<>]+</script>'),
+#     re.compile(r'<script[^>]*>[^<>]+navigator\.useragent.+includes\([^()]+\).+document\.title[^<>]+</script>'),
+#     re.compile(r'<script[^>]*>[^<>]+regexp.+document\.referrer.+window\.location\.href[^<>]+</script>', re.DOTALL),
+#     re.compile(r'<script[^>]*>[^<>]+navigator\.useragent\.tolowercase\(\).+document\.title[^<>]+</script>'),
+# ]
+
+# # JS混淆型代码特征
+# pattern_list_obf = [
+#     re.compile(r'<script[^>]*>.*parseint\(.+\).+string\.fromcharcode\([^()]+\).+tostring\([^()]+\).+regexp.+(?=.*javascript)(?=.*window)(?=.*document)(?=.*write).*</script>'),
+#     re.compile(r'<script[^>]*>\s*eval\(function.+parseint.+string\.fromcharcode.+tostring.+replace.+regexp.+window[^<>]+split[^<>]+</script>', re.DOTALL),
+#     re.compile(r'<script[^>]*>\s*var.+=\s*string\.fromcharcode\([^()]+\)\s*;\s*document\.write\([^()]+\)[^<>]+</script>', re.DOTALL),
+#     re.compile(r'''<script[^>]*>[^<>]*window\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\(\s*(['"](\\x[0-9a-f]{2})+['"])\s*\)[^<>]*</script>''', re.DOTALL),
+#     re.compile(r'''<script[^>]*>\s*\['sojson\.[^']+'\].*</script>''', re.DOTALL),
+#     re.compile(r'<script[^>]*>\s*eval.+string\.fromcharcode.+charcodeat\([^()]+\).+</script>'),
+#     re.compile(r'<script[^>]*>[^<>]+function.+math\.random.+charat.+document.createelement.+appendchild[^<>]+</script>'),
+#     re.compile(r'<script[^>]*>[^<>]+var.+jsjiami\.com.+</script>'),
+#     re.compile(r'<script[^>]*>.*eval\(.+\).+tostring\([^()]+\).+replace.+regexp.+(?=.*script)(?=.*js)(?=.*document)(?=.*write).*</script>'),
+# ]
+
 # UA判定型代码正则
 pattern_list_ua = [
-    re.compile(r'<script[^>]*>[^<>]+navigator\.useragent\.tolocalelowercase\(\)\.indexof.+document\.title[^<>]+</script>'),
-    re.compile(r'<script[^>]*>[^<>]+navigator\.useragent\.match\([^()]+\).+document\.title[^<>]+</script>'),
-    re.compile(r'<script[^>]*>[^<>]+navigator\.useragent\.tolocalelowercase\(\).+document\.title[^<>]+</script>', re.DOTALL),
-    re.compile(r'<script[^>]*>[^<>]+window\.location\.tostring\(\).indexof\([^()]+\).+window\.location\.href[^<>]+</script>'),
-    re.compile(r'<script[^>]*>[^<>]+navigator\.useragent.+includes\([^()]+\).+document\.title[^<>]+</script>'),
-    re.compile(r'<script[^>]*>[^<>]+regexp.+document\.referrer.+window\.location\.href[^<>]+</script>', re.DOTALL),
-    re.compile(r'<script[^>]*>[^<>]+navigator\.useragent\.tolowercase\(\).+document\.title[^<>]+</script>'),
+    re.compile(r'navigator\.useragent\.tolocalelowercase\(\)\.indexof.+document\.title'),
+    re.compile(r'navigator\.useragent\.match\([^()]+\).+document\.title'),
+    re.compile(r'navigator\.useragent\.tolocalelowercase\(\).+document\.title[^<>]', re.DOTALL),
+    re.compile(r'window\.location\.tostring\(\).indexof\([^()]+\).+window\.location\.href'),
+    re.compile(r'navigator\.useragent.+includes\([^()]+\).+document\.title'),
+    re.compile(r'regexp.+document\.referrer.+window\.location\.href', re.DOTALL),
+    re.compile(r'navigator\.useragent\.tolowercase\(\).+document\.title'),
+    re.compile(r'navigator\.useragent\.match\(.+\).+viewport.+hidden.+iframe.+src.+frameborder', re.DOTALL),
+    re.compile(r'i\.test\(navigator\.useragent\).+document\.referrer\.tolowercase.+referrer\.includes.+window\.location\.href', re.DOTALL),
+    re.compile(r'document\.referrer.+navigator\.useragent\.tolowercase.+frameborder.+iframe.+viewport', re.DOTALL),
+    re.compile(r'navigator\.useragent\.tolowercase.+navigator\.useragent\.match.+document\.referrer\.match.+urlparams\.get.+window\.location\.href', re.DOTALL),
 ]
 
 # JS混淆型代码特征
-pattern_list_js = [
-    re.compile(r'<script[^>]*>.*parseint\(.+\).+string\.fromcharcode\([^()]+\).+tostring\([^()]+\).+regexp.+(?=.*javascript)(?=.*window)(?=.*document)(?=.*write).*</script>'),
-    re.compile(r'<script[^>]*>\s*eval\(function.+parseint.+string\.fromcharcode.+tostring.+replace.+regexp.+window[^<>]+split[^<>]+</script>', re.DOTALL),
-    re.compile(r'<script[^>]*>\s*var.+=\s*string\.fromcharcode\([^()]+\)\s*;\s*document\.write\([^()]+\)[^<>]+</script>', re.DOTALL),
-    re.compile(r'''<script[^>]*>[^<>]*window\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\(\s*(['"](\\x[0-9a-f]{2})+['"])\s*\)[^<>]*</script>''', re.DOTALL),
-    re.compile(r'''<script[^>]*>\s*\['sojson\.[^']+'\].*</script>''', re.DOTALL),
-    re.compile(r'<script[^>]*>\s*eval.+string\.fromcharcode.+charcodeat\([^()]+\).+</script>'),
-    re.compile(r'<script[^>]*>[^<>]+function.+math\.random.+charat.+document.createelement.+appendchild[^<>]+</script>'),
-    re.compile(r'<script[^>]*>[^<>]+var.+jsjiami\.com.+</script>'),
-    re.compile(r'<script[^>]*>.*eval\(.+\).+tostring\([^()]+\).+replace.+regexp.+(?=.*script)(?=.*js)(?=.*document)(?=.*write).*</script>'),
+pattern_list_obf = [
+    re.compile(r'parseint\(.+\).+string\.fromcharcode\([^()]+\).+tostring\([^()]+\).+regexp.+(?=.*javascript)(?=.*window)(?=.*document)(?=.*write)'),
+    re.compile(r'eval\(function.+parseint.+string\.fromcharcode.+tostring.+replace.+regexp.+window[^<>]+split', re.DOTALL),
+    re.compile(r'var.+=\s*string\.fromcharcode\([^()]+\)\s*;\s*document\.write\([^()]+\)', re.DOTALL),
+    re.compile(r'''^\s*window\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\(\s*(['"](\\x[0-9a-f]{2})+['"])\s*\)''', re.DOTALL),
+    re.compile(r'''window\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\(\s*(['"](\\x[0-9a-f]{2})+['"])\s*\).+(android|navigator)''', re.DOTALL),
+    re.compile(r'''\['sojson\.[^']+'\]''', re.DOTALL),
+    re.compile(r'eval.+string\.fromcharcode.+charcodeat\([^()]+\)'),
+    re.compile(r'function.+math\.random.+charat.+document.createelement.+appendchild'),
+    re.compile(r'jsjiami\.com\.v7'),
+    re.compile(r'eval\(.+\).+tostring\([^()]+\).+replace.+regexp.+(?=.*script)(?=.*js)(?=.*document)(?=.*write)'),
 ]
 
 logger = logging.getLogger(__name__)
@@ -66,7 +94,14 @@ def detect(queue_data, config):
                '异常文本关键词',
                '命中关键词',
                '关键词匹配度',
-               '关键词与其他文本的相似度']
+               '关键词与其他文本的相似度',
+               '移动端UA最终URL',
+               '不同UA的URL域名是否一致',
+               '不同UA页面文本的相似度',
+               '疑似植入的JS链接',
+               '疑似植入的JS链接命中正则']
+
+    detector_num = 0
 
     logger.info("Detector process started")
 
@@ -85,39 +120,54 @@ def detect(queue_data, config):
         final_url = data["final_url"]
         ip_address = data["ip_address"]
         content = data["content"]
+        content_mobile = data["content_mobile"]
+        final_url_mobile = data["final_url_mobile"]
+        js_file_list = data["js_file_list"]
         is_tampered = False
         tampering_keywords = []
         matched_combinations = []
         match_ratio = 0.0
-        tampering_code = ''
+        tampering_code = []
         keywords_similarity = 0.0
+        tampering_js_urls = []
+        tampering_js_patterns = []
 
         logger.info(f'Detect website {domain}')
 
-        title, text_list_meta, text_list_body, other_text = extract_text(content)
+        js_code_list, title, text_list_meta, text_list_body, other_text = extract_text(content)
 
         is_pattern_match_js = False
         is_pattern_match_ua = False
         is_text_match_meta = False
         is_text_match_body = False
 
-        html_content = filter_long_lines(content, 10000).lower()
+        # html_content = filter_long_lines(content, 10000).lower()
 
         # 判断是否存在JS混淆型代码
-        for pattern in pattern_list_js:
-            search_result = pattern.search(html_content)
-            if search_result:
-                tampering_code = search_result.group()
-                is_pattern_match_js = True
-                break
+        for js_code in js_code_list:
+            for pattern in pattern_list_obf:
+                search_result = partial_match(pattern, js_code)
+                if search_result:
+                    tampering_code.append(js_code)
+                    is_pattern_match_js = True
+                    break
 
         # 判断是否存在UA判定型代码
-        if not is_pattern_match_js:
+        for js_code in js_code_list:
             for pattern in pattern_list_ua:
-                search_result = pattern.search(html_content)
+                search_result = partial_match(pattern, js_code)
                 if search_result:
-                    tampering_code = search_result.group()
+                    tampering_code.append(js_code)
                     is_pattern_match_ua = True
+                    break
+
+        # 判断是否存在被植入的JS文件，可能存在多个
+        for js_url, js_content in js_file_list:
+            for pattern in pattern_list_obf + pattern_list_ua:
+                search_result = partial_match(pattern, js_content)
+                if search_result:
+                    tampering_js_urls.append(js_url)
+                    tampering_js_patterns.append(str(pattern))
                     break
 
         # 计算匹配的关键词组合和出现的词语在所有关键词中的占比
@@ -153,38 +203,60 @@ def detect(queue_data, config):
             keywords_other = extract_keywords(other_text)
             keywords_similarity = calculate_similarity(tampering_keywords, keywords_other)
 
+        is_final_url_same = compare_main_domains(final_url, final_url_mobile)
+
         # 判断存在网站篡改的条件：
         # 1.存在JS混淆型代码
         # 2.存在UA判定型代码且meta信息符合关键词匹配条件
         # 3.body中特定HTML结构文本符合关键词匹配条件
         # 4.关键词匹配率达到独立判定阈值且与其他文本的相似度低于阈值
+        # 5.存在疑似植入的JS且PC端UA和移动端UA跳转至不同的页面
         if (is_pattern_match_js
                 or (is_pattern_match_ua and is_text_match_meta)
                 or is_text_match_body
                 or (match_ratio >= keywords_match_ratio_independent
-                    and keywords_similarity <= keywords_similarity_independent)):
+                    and keywords_similarity <= keywords_similarity_independent)
+                or (tampering_js_urls and not is_final_url_same)):
             is_tampered = True
 
         # 判断IP是否在中国大陆境内
         is_china_mainland = is_china_mainland_ip(ip_address, cn_ip_ranges) if ip_address else ''
 
+        # 计算主机端和移动端UA访问页面内容的相似度
+        text_host = extract_text_from_html(content)
+        text_mobile = extract_text_from_html(content_mobile)
+        similarity_host_mobile = compute_similarity(text_host, text_mobile)
+
+        logger.debug(f'Text of {domain} with host UA: {text_host[:500]}\n\n'
+                    f'Text of {domain} with mobile UA: {text_mobile[:500]}\n\n'
+                    f'Similarity: {similarity_host_mobile}')
+
         # 输出结果
         output_data = [domain,
                        '是' if is_crawler_success else '否',
-                       title,
+                       remove_control_characters(title),
                        full_domain,
                        final_url,
                        ip_address,
                        is_china_mainland,
                        '是' if is_tampered else '否',
-                       tampering_code if is_tampered else '',
-                       ' '.join(tampering_keywords),
+                       '\n\n'.join(tampering_code) if is_tampered else '',
+                       ' '.join(remove_control_characters(tampering_keywords)),
                        ' '.join(matched_combinations),
                        match_ratio,
-                       keywords_similarity]
+                       keywords_similarity,
+                       final_url_mobile,
+                       '是' if is_final_url_same else '否',
+                       similarity_host_mobile,
+                       '\n'.join(tampering_js_urls),
+                       '\n'.join(tampering_js_patterns),]
         data_list.append(output_data)
 
         logger.debug(str(output_data))
+
+        detector_num += 1
+        if detector_num % 1000 == 0:
+            save_data_to_excel(file_output, headers, data_list)
 
     save_data_to_excel(file_output, headers, data_list)
 
@@ -250,5 +322,16 @@ def extract_text(html_content):
 
     text_list_body = [hidden_div_li_text, hidden_div_a_text, hidden_tables_text, hidden_div_links_text]
 
-    return title, text_list_meta, text_list_body, other_text
+    # 提取所有的JS代码
+    js_code_list = []
+
+    # 查找所有的<script>标签
+    for script in soup.find_all('script'):
+        # 检查<script>标签是否有src属性
+        if not script.has_attr('src'):
+            # 提取<script>标签中的JavaScript代码
+            if script.string:
+                js_code_list.append(script.string.strip().lower())
+
+    return js_code_list, title, text_list_meta, text_list_body, other_text
 
