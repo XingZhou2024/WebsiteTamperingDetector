@@ -1,11 +1,12 @@
 import json
-import threading
 import logging
+from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
-from selenium.common.exceptions import UnexpectedAlertPresentException, NoAlertPresentException, TimeoutException, InvalidSessionIdException
+from selenium.common.exceptions import UnexpectedAlertPresentException, NoAlertPresentException
+from selenium.common.exceptions import TimeoutException, InvalidSessionIdException
 from core.utils import *
 
 
@@ -19,10 +20,8 @@ class Crawler:
         self.config = config
         self.webdriver_pool = webdriver_pool
 
-    def crawler(self, domain):
-        logger.info(f'Start crawler {domain}')
-        driver = self.webdriver_pool.get_driver()
-        driver_mobile = self.webdriver_pool.get_driver_mobile()
+    def crawl(self, domain):
+        logger.info(f'Start crawl {domain}')
 
         # 爬虫结果数据
         data = {
@@ -36,6 +35,9 @@ class Crawler:
             "final_url_mobile": '',  # 以移动端UA打开网站时最终的URL
             "js_file_list": []  # 访问网站首页时的JS加载列表
         }
+
+        driver = self.webdriver_pool.get_driver()
+        driver_mobile = self.webdriver_pool.get_driver_mobile()
 
         create_new_driver = False
 
@@ -64,11 +66,7 @@ class Crawler:
 
                 except NoAlertPresentException:
                     pass  # 如果没有弹窗，继续执行
-            except TimeoutException as e:
-                # if 'Timed out receiving message from renderer' in str(e):
-                #     # 若出现此类错误则重新创建一个webdriver实例
-                #     create_new_driver = True
-                #     logger.info(f'Restart webdriver for {str(e)}')
+            except TimeoutException:
                 pass
 
             # 等待页面加载完成
@@ -86,7 +84,7 @@ class Crawler:
             load_time_ms = load_event_end - navigation_start
             load_time_sec = load_time_ms / 1000
 
-            logger.info(f'Crawler {domain} with host UA, load time {load_time_sec:.2f}')
+            logger.info(f'Crawl {domain} with host UA, load time {load_time_sec:.2f}')
 
             # 获取 JavaScript 文件内容
             logs = driver.get_log('performance')
@@ -122,11 +120,7 @@ class Crawler:
 
                 except NoAlertPresentException:
                     pass  # 如果没有弹窗，继续执行
-            except TimeoutException as e:
-                # if 'Timed out receiving message from renderer' in str(e):
-                #     # 若出现此类错误则重新创建一个webdriver实例
-                #     create_new_driver = True
-                #     logger.info(f'Restart webdriver for {str(e)}')
+            except TimeoutException:
                 pass
 
             # 等待页面加载完成
@@ -144,20 +138,21 @@ class Crawler:
             load_time_ms = load_event_end - navigation_start
             load_time_sec = load_time_ms / 1000
 
-            logger.info(f'Crawler {domain} with mobile UA, load time {load_time_sec:.2f}')
+            logger.info(f'Crawl {domain} with mobile UA, load time {load_time_sec:.2f}')
 
             # 爬取页面内容
             content_mobile = driver_mobile.page_source
             final_url_mobile = driver_mobile.current_url
 
-            # 生成数据结构
-            data["is_crawler_success"] = True
-            data["full_domain"] = full_domain
-            data["final_url"] = final_url
-            data["ip_address"] = ip_address
-            data["content"] = content
-            data["content_mobile"] = content_mobile
-            data["final_url_mobile"] = final_url_mobile
+            if content or content_mobile:
+                # 生成数据结构
+                data["is_crawler_success"] = True
+                data["full_domain"] = full_domain
+                data["final_url"] = final_url
+                data["ip_address"] = ip_address
+                data["content"] = content
+                data["content_mobile"] = content_mobile
+                data["final_url_mobile"] = final_url_mobile
 
             return data
 
@@ -166,10 +161,11 @@ class Crawler:
             create_new_driver = True
             logger.info(f'Restart webdriver for {e}')
 
+            return data
+
         except Exception as e:
             logger.error(f"{domain} crawler failed for {e}")
 
-            # 返回爬取失败结果
             return data
         finally:
             self.webdriver_pool.return_driver(driver, create_new_driver)
@@ -180,30 +176,46 @@ class CrawlerPool:
     def __init__(self, num_crawler_processes, config, webdriver_pool):
         self.num_crawler_processes = num_crawler_processes
         self.config = config
+        self.thread_waite_time = config.get("max_wait_time") * 2
         self.webdriver_pool = webdriver_pool
-        self.crawlers = [Crawler(config, webdriver_pool) for _ in range(num_crawler_processes)]
-        self.lock = threading.Lock()
-        self.next_crawler = 0
+        self.crawlers = Queue(maxsize=num_crawler_processes)
+        # 将所有crawler放入队列
+        for _ in range(num_crawler_processes):
+            self.crawlers.put(Crawler(config, webdriver_pool))
+
         logger.info("CrawlerPool initialized")
 
-    def _get_next_crawler(self):
-        with self.lock:
-            crawler = self.crawlers[self.next_crawler]
-            self.next_crawler = (self.next_crawler + 1) % self.num_crawler_processes
-        return crawler
+    def _get_crawler(self):
+        return self.crawlers.get()
+
+    def _return_crawler(self, crawler):
+        self.crawlers.put(crawler)
 
     def crawler(self, domains, queue_data):
         with ThreadPoolExecutor(max_workers=self.num_crawler_processes) as executor:
-            futures = [executor.submit(self._crawler_and_queue, domain, queue_data) for domain in domains]
+            futures = [executor.submit(self._crawl_and_queue, domain, queue_data) for domain in domains]
             for future in futures:
-                future.result()
+                try:
+                    # 设置超时，以避免某些任务无限阻塞
+                    future.result(timeout=self.thread_waite_time)
+                except TimeoutError:
+                    logger.error("Crawling timed out")
+                except Exception as e:
+                    logger.error(f"Error during crawling: {str(e)}")
         logger.info("All crawler tasks completed")
 
-    def _crawler_and_queue(self, domain, queue_data):
-        crawler = self._get_next_crawler()
-        data = crawler.crawler(domain)
-        if data:
-            queue_data.put(data)
+    def _crawl_and_queue(self, domain, queue_data):
+        crawler = self._get_crawler()
+        try:
+            data = crawler.crawl(domain)
+            logger.info(f'Complete crawl {domain}')
+            if data:
+                queue_data.put_nowait(data)
+                logger.info(f'Put crawl data of {domain}')
+        except Exception as e:
+            logger.error(f"Error in domain {domain}: {str(e)}")
+        finally:
+            self._return_crawler(crawler)
 
     def close(self):
         self.webdriver_pool.close_all()

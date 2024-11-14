@@ -6,13 +6,13 @@ import socket
 import ipaddress
 import requests
 import tldextract
+import pandas as pd
 from collections import Counter
-from openpyxl import Workbook
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from requests.exceptions import RequestException
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 ip_pattern = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
@@ -149,18 +149,8 @@ def filter_long_lines(content, max_length=1000):
 
 def save_data_to_excel(file_path, headers, data):
     """将数据写入Excel文件"""
-    wb_save = Workbook()
-    ws_save = wb_save.active
-    # 写入标题
-    for col_index, header in enumerate(headers, start=1):
-        ws_save.cell(row=1, column=col_index, value=header)
-
-    # 写入数据
-    for row_index, row_data in enumerate(data, start=2):
-        for col_index, cell_value in enumerate(row_data, start=1):
-            ws_save.cell(row=row_index, column=col_index, value=cell_value)
-
-    wb_save.save(file_path)
+    df = pd.DataFrame(data, columns=headers)
+    df.to_excel(file_path, index=False)
 
 
 def calculate_similarity(list1, list2):
@@ -231,8 +221,8 @@ def compare_main_domains(url_or_domain1, url_or_domain2):
     return main_domain1 == main_domain2
 
 
-def extract_text_from_html(html_content, text_separator=' '):
-    """从HTML内容中提取所有文本，包括title、keywords和description"""
+def extract_text_from_html(html_content, text_separator='\n'):
+    """从HTML内容中提取所有文本，包括title、keywords和description，以及所有的JS代码"""
     soup = BeautifulSoup(html_content, 'html.parser')
 
     # 提取title
@@ -248,22 +238,33 @@ def extract_text_from_html(html_content, text_separator=' '):
     description_tag = soup.find('meta', attrs={'name': 'description'})
     description = description_tag['content'].strip() if description_tag and 'content' in description_tag.attrs else ''
 
-    # 提取页面正文文本
-    body_text = soup.get_text(separator=text_separator, strip=True)
-
     # 查找所有设置为hidden的元素
     hidden_elements = soup.find_all(
         lambda tag: tag.has_attr('hidden')
-        or ('style' in tag.attrs and 'display:none' in tag['style'].replace(' ', '')))
+                    or ('style' in tag.attrs and 'display:none' in tag['style'].replace(' ', '')))
 
     # 提取hidden元素中的文本
     hidden_texts = text_separator.join(
         [element.get_text(separator=text_separator, strip=True) for element in hidden_elements])
 
-    # 合并所有文本内容
-    combined_text = text_separator.join(filter(None, [title, keywords, description, body_text, hidden_texts]))
+    # 提取页面正文文本
+    body_text = soup.get_text(separator=text_separator, strip=True)
 
-    return combined_text
+    # 合并所有文本内容
+    body_text = text_separator.join(filter(None, [hidden_texts, body_text]))
+
+    # 提取所有的JS代码
+    js_code_list = []
+
+    # 查找所有的<script>标签
+    for script in soup.find_all('script'):
+        # 检查<script>标签是否有src属性
+        if not script.has_attr('src'):
+            # 提取<script>标签中的JavaScript代码
+            if script.string:
+                js_code_list.append(script.string.strip().lower())
+
+    return title, keywords, description, body_text, js_code_list
 
 
 def compute_similarity(text1, text2):
@@ -326,4 +327,97 @@ def remove_control_characters(value):
         # 仅保留常见的字符（Unicode 码点大于等于32）
         return re.sub(r'[\x00-\x1F\x7F-\x9F]', '', value)
     return value
+
+
+def sliding_window_similarity(target, sample, sample_tokenized,
+                              target_similarity=0.5, step=5, split_to_single_char=False):
+    """使用滑动窗口计算目标文本和样本的相似度"""
+    target_length = len(target)
+    sample_length = len(sample)
+    window_size = sample_length
+    max_window_similarity = 0.0
+    max_window_text = ''
+
+    vectorizer = TfidfVectorizer(ngram_range=(2, 4), min_df=1, stop_words=None)
+
+    if split_to_single_char:
+        # 拆分成单个词
+        sample_tokenized = ' '.join(list(sample))
+
+    try:
+        sample_tfidf = vectorizer.fit_transform([sample_tokenized])
+    except ValueError:
+        return round(max_window_similarity, 2), max_window_text
+
+    if target_length <= sample_length:
+        sliding_range = range(0, 1)
+    else:
+        sliding_range = range(0, target_length - window_size + 1, step)
+
+    # 从文本开头开始滑动
+    for i in sliding_range:
+        window_text = target[i:i + window_size]
+
+        if split_to_single_char:
+            # 拆分成单个词
+            window_tokenized = ' '.join(list(window_text))
+        else:
+            # 使用jieba分词
+            window_tokenized = ' '.join(jieba.lcut(window_text))
+
+        try:
+            # 提取当前窗口的TF-IDF特征
+            window_tfidf = vectorizer.transform([window_tokenized])
+        except ValueError:
+            continue
+
+        # 计算窗口与样本的相似度
+        window_similarity = cosine_similarity(window_tfidf, sample_tfidf)[0][0]
+        if window_similarity >= target_similarity:
+            return round(window_similarity, 2), window_text
+        if window_similarity > max_window_similarity:
+            max_window_similarity = window_similarity
+            max_window_text = window_text
+
+    return round(max_window_similarity, 2), max_window_text
+
+
+def text_sample_similarity(text, sample_dict, min_length=8, max_length=200, target_similarity=0.5):
+    """计算网页文本和样本的相似度"""
+    max_similarity = 0.0
+    max_line = ''
+    max_sample = ''
+    for line in text.split('\n'):
+        line = line.strip().lower()[:max_length]
+        text_length = len(line)
+        if text_length < min_length:
+            continue
+        for keywords in sample_dict:
+            if not all(keyword in line for keyword in keywords):
+                continue
+            for text_sample, sample_tokenized in sample_dict[keywords]:
+                similarity, text = sliding_window_similarity(
+                    line, text_sample, sample_tokenized, target_similarity=target_similarity)
+                if similarity > max_similarity:
+                    max_similarity = similarity
+                    max_sample = text_sample
+                    max_line = line
+                if max_similarity > target_similarity:
+                    return max_line, max_similarity, max_sample
+    return max_line, max_similarity, max_sample
+
+
+def load_sample_dict(file_path, sheet_name='Sheet1'):
+    """加载并生成样本字典"""
+    sample_dict = {}
+
+    df = pd.read_excel(file_path, sheet_name=sheet_name, header=None)
+    for index, row in df.iterrows():
+        text, keywords_str = row
+        keywords_list = eval(keywords_str)
+        keywords_list.sort()
+        keywords = tuple(keywords_list)
+        sample_tokenized = ' '.join(jieba.lcut(text))
+        sample_dict.setdefault(keywords, []).append((text, sample_tokenized))
+    return sample_dict
 

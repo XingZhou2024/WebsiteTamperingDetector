@@ -2,5 +2,7 @@ selenium
 pyyaml
 bs4
 jieba
-openpyxl
 requests
+tldextract
+sklearn
+pandas

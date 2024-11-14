@@ -128,17 +128,26 @@ class WebDriverPool:
         with self.lock:
             return self.drivers_mobile.get()
 
+    @staticmethod
+    def clear_driver_state(driver):
+        try:
+            driver.delete_all_cookies()  # 清理 Cookies
+            driver.get("about:blank")
+        except Exception as e:
+            logger.error(f"Error clearing driver state: {e}")
+
     def return_driver(self, driver, create_new_driver=False):
+        self.clear_driver_state(driver)
         self.driver_usage[driver] += 1
         if self.driver_usage[driver] >= self.max_usage:
             self.restart_driver(driver)
         elif create_new_driver:
             self.restart_driver(driver)
         else:
-            with self.lock:
-                self.drivers.put(driver)
+            self.drivers.put(driver)
 
     def return_driver_mobile(self, driver, create_new_driver=False):
+        self.clear_driver_state(driver)
         self.driver_usage[driver] += 1
         if self.driver_usage[driver] >= self.max_usage:
             self.restart_driver_mobile(driver)

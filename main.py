@@ -45,7 +45,7 @@ def main():
     crawler_pool.crawler(domains, queue_data)
 
     # 结束判定进程
-    queue_data.put(None)
+    queue_data.put_nowait(None)
     check_process.join()
 
     logger.info("Website Tampering Detector finished.")
