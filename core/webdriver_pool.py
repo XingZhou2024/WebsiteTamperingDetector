@@ -91,6 +91,11 @@ class WebDriverPool:
             "profile.default_content_setting_values.automatic_downloads": 2  # 禁止多文件下载
         })
 
+        # 设置日志记录的首选项
+        chrome_options.set_capability(
+            "goog:loggingPrefs", {"performance": "ALL", "browser": "ALL"}
+        )
+
         # 指定user_agent，包含百度爬虫的特征，针对user_agent判定型代码
         user_agent = self.config.get("crawler_user_agent_mobile")
         chrome_options.add_argument(f"user-agent={user_agent}")

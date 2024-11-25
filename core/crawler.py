@@ -140,6 +140,23 @@ class Crawler:
 
             logger.info(f'Crawl {domain} with mobile UA, load time {load_time_sec:.2f}')
 
+            # 获取 JavaScript 文件内容
+            logs = driver_mobile.get_log('performance')
+            for log in logs:
+                log_entry = json.loads(log['message'])
+                message = log_entry['message']
+                if message['method'] == 'Network.requestWillBeSent':
+                    request_url = message['params']['request']['url']
+                    if not request_url.endswith('.js'):
+                        continue
+                    request_id = message['params']['requestId']
+                    try:
+                        response_body = driver.execute_cdp_cmd('Network.getResponseBody', {'requestId': request_id})
+                        logger.debug(f"{domain} {request_url} {response_body['body'][:500]}")
+                        data["js_file_list"].append((request_url, response_body['body']))
+                    except:
+                        pass
+
             # 爬取页面内容
             content_mobile = driver_mobile.page_source
             final_url_mobile = driver_mobile.current_url

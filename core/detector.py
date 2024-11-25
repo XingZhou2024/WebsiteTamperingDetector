@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 def detect(queue_data, config):
 
     sample_similarity_ratio = config.get("sample_similarity_ratio")
-    similarity_ratio_meta_body = config.get("similarity_ratio_meta_body")
+    text_similarity_ratio = config.get("text_similarity_ratio")
     sample_file_path = config.get("sample_file_path")
     file_ip_data = config.get("file_ip_data")
     ip_data_url = config.get("ip_data_url")
@@ -120,7 +120,7 @@ def detect(queue_data, config):
         is_pattern_match_ua = False
 
         # 判断是否存在JS混淆型代码
-        for js_code in js_code_list:
+        for js_code in set(js_code_list + js_code_list_mobile):
             for pattern in pattern_list_obf:
                 search_result = partial_match(pattern, js_code)
                 if search_result:
@@ -129,7 +129,7 @@ def detect(queue_data, config):
                     break
 
         # 判断是否存在UA判定型代码
-        for js_code in js_code_list:
+        for js_code in set(js_code_list + js_code_list_mobile):
             for pattern in pattern_list_ua:
                 search_result = partial_match(pattern, js_code)
                 if search_result:
@@ -138,7 +138,7 @@ def detect(queue_data, config):
                     break
 
         # 判断是否存在被植入的JS文件，可能存在多个
-        for js_url, js_content in js_file_list:
+        for js_url, js_content in set(js_file_list):
             for pattern in pattern_list_obf + pattern_list_ua:
                 search_result = partial_match(pattern, js_content)
                 if search_result:
@@ -161,9 +161,6 @@ def detect(queue_data, config):
         if title_similarity > max_similarity:
             max_line, max_similarity, max_sample = title_line, title_similarity, title_sample
 
-        # similarity_title_body = compute_similarity(title, body_text)
-        # is_title_abnormal = (title_similarity >= sample_similarity_ratio_meta
-        #                      and similarity_title_body <= similarity_ratio_meta_body)
         is_title_abnormal = title_similarity >= sample_similarity_ratio
 
         meta_line, meta_similarity, meta_sample = text_sample_similarity(
@@ -173,10 +170,6 @@ def detect(queue_data, config):
         if meta_similarity > max_similarity:
             max_line, max_similarity, max_sample = meta_line, meta_similarity, meta_sample
 
-        # 判断body中是否存在与篡改样本相似的文本
-        # similarity_meta_body = compute_similarity('\n'.join(filter(None, [keywords, description])), body_text)
-        # is_meta_abnormal = (meta_similarity >= sample_similarity_ratio_meta
-        #                     and similarity_meta_body <= similarity_ratio_meta_body)
         is_meta_abnormal = meta_similarity >= sample_similarity_ratio
 
         # 提取body中与样本相似的文本
