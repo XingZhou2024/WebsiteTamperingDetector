@@ -15,9 +15,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 
-ip_pattern = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
-ip_port_pattern = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$")
-domain_port_pattern = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}:\d+$")
+pattern_ip = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
+pattern_ip_port = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$")
+pattern_domain_port = re.compile(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}:\d+$")
+
+pattern_illegal_characters = re.compile(r"[\x00-\x1F]")
 
 
 def download_china_mainland_data(file_path, ip_data_url):
@@ -60,17 +62,17 @@ def resolve_domain(domain, max_retries=3, timeout=3):
     """解析域名的IP地址，如果输入的域名是IP、IP:端口或域名:端口形式的，则正确解析IP"""
 
     # 检查是否为纯 IP 地址
-    if ip_pattern.match(domain):
+    if pattern_ip.match(domain):
         # 直接返回 IP 地址
         return domain
 
     # 检查是否为 IP:端口 的格式
-    if ip_port_pattern.match(domain):
+    if pattern_ip_port.match(domain):
         # 提取并返回 IP 部分
         return domain.split(':')[0]
 
     # 检查是否为 域名:端口 的格式
-    if domain_port_pattern.match(domain):
+    if pattern_domain_port.match(domain):
         # 提取并保留域名部分（去掉端口）
         domain = domain.split(':')[0]
 
@@ -147,9 +149,22 @@ def filter_long_lines(content, max_length=1000):
     return "\n".join(filtered_lines)
 
 
-def save_data_to_excel(file_path, headers, data):
+def remove_illegal_characters(value):
+    """清理数据中的非法字符"""
+    if isinstance(value, str):
+        # 过滤掉非法字符
+        return re.sub(r"[\x00-\x1F]", "", value)
+    return value
+
+
+def save_data_to_excel(file_path, headers, data_list):
     """将数据写入Excel文件"""
-    df = pd.DataFrame(data, columns=headers)
+    # 清理数据中的非法字符
+    cleaned_data_list = [
+        [remove_illegal_characters(value) for value in data]
+        for data in data_list
+    ]
+    df = pd.DataFrame(cleaned_data_list, columns=headers)
     df.to_excel(file_path, index=False)
 
 
@@ -330,7 +345,7 @@ def remove_control_characters(value):
 
 
 def sliding_window_similarity(target, sample, sample_tokenized,
-                              target_similarity=0.5, step=5, split_to_single_char=False):
+                              target_similarity=1.0, step=5, split_to_single_char=False):
     """使用滑动窗口计算目标文本和样本的相似度"""
     target_length = len(target)
     sample_length = len(sample)
@@ -382,7 +397,7 @@ def sliding_window_similarity(target, sample, sample_tokenized,
     return round(max_window_similarity, 2), max_window_text
 
 
-def text_sample_similarity(text, sample_dict, min_length=8, max_length=200, target_similarity=0.5):
+def text_sample_similarity(text, sample_dict, min_length=8, max_length=200, target_similarity=1.0):
     """计算网页文本和样本的相似度"""
     max_similarity = 0.0
     max_line = ''
