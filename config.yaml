@@ -1,16 +1,18 @@
 num_crawler_processes: 10  # 爬虫进程数量限制
 max_wait_time: 100  # 爬取页面时最大等待时间
 body_wait_time: 10  # body加载等待时间
+save_html: True
 file_input: "input.txt"  # 输入文件名称
 file_output: "output.xlsx"  # 输出文件名称
 chrome_driver_path: "/usr/bin/chromedriver"  # ChromeDriver路径
 
+html_save_path: "html"  # HTML文件存储路径
 log_file: "logs/run.log"  # 日志文件路径
 file_ip_data: "data/china_ip_list.txt"  # 中国大陆境内IP数据文件
 ip_data_url: "https://raw.githubusercontent.com/17mon/china_ip_list/master/china_ip_list.txt"  # 中国大陆境内IP数据文件下载地址
 sample_file_path: "data/sample.xlsx"
 sample_similarity_ratio: 0.65  # Meta信息与样本的相似度阈值
-similarity_ratio_meta_body: 0.1 # 判定Meta和Body的内容相似度阈值
+text_similarity_ratio: 0.1 # 判定Meta和Body的内容相似度阈值
 webdriver_max_usage: 500  # webdriver爬取一定次数后进行重启的阈值
-crawler_user_agent_host: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36; Baiduspider/2.0"
+crawler_user_agent_desktop: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36; Baiduspider/2.0"
 crawler_user_agent_mobile: "Mozilla/5.0 (Linux; Android 10; iPhone OS 14_0 like Mac OS X) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Mobile Safari/537.36"

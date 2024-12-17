@@ -1,5 +1,6 @@
 import logging
 from core.utils import *
+from datetime import datetime
 
 
 # UA判定型代码正则
@@ -39,7 +40,8 @@ logger = logging.getLogger(__name__)
 def detect(queue_data, config):
 
     sample_similarity_ratio = config.get("sample_similarity_ratio")
-    text_similarity_ratio = config.get("text_similarity_ratio")
+    save_html = config.get("save_html")
+    html_save_path = config.get("html_save_path")
     sample_file_path = config.get("sample_file_path")
     file_ip_data = config.get("file_ip_data")
     ip_data_url = config.get("ip_data_url")
@@ -60,6 +62,14 @@ def detect(queue_data, config):
     else:
         cn_ip_ranges = parse_china_mainland_data(ip_data)
         logger.info(f'Load {len(cn_ip_ranges)} ip ranges')
+
+    # 创建保存HTML文件的目录
+    if save_html:
+        now = datetime.now()
+        formatted_date = now.strftime('%Y%m%d')
+        html_save_path_date = os.path.join(html_save_path, formatted_date)
+        if not os.path.exists(html_save_path_date):
+            os.makedirs(html_save_path_date)
 
     headers = ['域名',
                '是否爬取成功',
@@ -152,7 +162,7 @@ def detect(queue_data, config):
         # 判断IP是否在中国大陆境内
         is_china_mainland = is_china_mainland_ip(ip_address, cn_ip_ranges) if ip_address else ''
 
-        text_host = '\n'.join(filter(None, [title, keywords, description, body_text]))
+        text_desktop = '\n'.join(filter(None, [title, keywords, description, body_text]))
         text_mobile = '\n'.join(filter(None, [title_mobile, keywords_mobile, description_mobile, body_text_mobile]))
 
         # 判断title, keywords, description是否与篡改样本相似，并且与body中文本的相似度较低
@@ -186,11 +196,11 @@ def detect(queue_data, config):
         is_body_abnormal = body_similarity >= sample_similarity_ratio
 
         # 计算主机端和移动端UA访问页面内容的相似度
-        similarity_host_mobile = compute_similarity(text_host, text_mobile)
+        similarity_desktop_mobile = compute_similarity(text_desktop, text_mobile)
 
-        logger.debug(f'Text of {domain} with host UA: {text_host[:500]}\n\n'
+        logger.debug(f'Text of {domain} with desktop UA: {text_desktop[:500]}\n\n'
                      f'Text of {domain} with mobile UA: {text_mobile[:500]}\n\n'
-                     f'Similarity: {similarity_host_mobile}')
+                     f'Similarity: {similarity_desktop_mobile}')
 
         # 存在以下两种及以上情况，则判定为被篡改：
         # 1.存在JS混淆型代码
@@ -235,7 +245,7 @@ def detect(queue_data, config):
                        is_china_mainland,  # IP是否在中国大陆境内
                        final_url_mobile,  # 移动端UA访问时最终URL
                        '是' if is_final_url_same else '否',  # 不同UA的URL域名是否一致
-                       similarity_host_mobile,  # 不同UA页面文本的相似度
+                       similarity_desktop_mobile,  # 不同UA页面文本的相似度
                        '是' if is_tampered else '否',  # 是否符合篡改特征
                        '\n\n'.join(tampering_code) if is_tampered else '',  # 疑似篡改代码
                        '\n'.join(tampering_js_urls),  # 疑似植入的JS链接
@@ -246,6 +256,13 @@ def detect(queue_data, config):
         data_list.append(output_data)
 
         logger.debug(str(output_data))
+
+        # 保存HTML文件
+        if save_html and full_domain:
+            if content:
+                save_page_content(html_save_path_date, f'{full_domain}_desktop', content)
+            if content_mobile:
+                save_page_content(html_save_path_date, f'{full_domain}_mobile', content_mobile)
 
         detector_num += 1
         if detector_num % 1000 == 0:

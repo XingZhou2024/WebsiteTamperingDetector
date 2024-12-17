@@ -436,3 +436,11 @@ def load_sample_dict(file_path, sheet_name='Sheet1'):
         sample_dict.setdefault(keywords, []).append((text, sample_tokenized))
     return sample_dict
 
+
+def save_page_content(output_dir, file_name, content):
+    """将网页内容保存到文件"""
+    safe_name = re.sub(r'[\\/:*?"<>|]', '_', file_name)
+    file_path = os.path.join(output_dir, f"{safe_name}.html")
+    with open(file_path, 'w', encoding='utf-8') as file:
+        file.write(content)
+

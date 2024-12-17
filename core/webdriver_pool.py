@@ -44,7 +44,7 @@ class WebDriverPool:
         })
 
         # 指定user_agent，包含百度爬虫的特征，针对user_agent判定型代码
-        user_agent = self.config.get("crawler_user_agent_host")
+        user_agent = self.config.get("crawler_user_agent_desktop")
         chrome_options.add_argument(f"user-agent={user_agent}")
 
         # 指定chromedriver路径
@@ -66,7 +66,7 @@ class WebDriverPool:
             driver.set_page_load_timeout(self.config.get("max_wait_time"))
             self.drivers.put(driver)
             self.driver_usage[driver] = 0
-        logging.info(f'Create {num} host webdriver')
+        logging.info(f'Create {num} desktop webdriver')
 
     def _create_drivers_mobile(self, num):
         # 生成UA为移动端的WebDriver实例池
@@ -179,7 +179,7 @@ class WebDriverPool:
             pass
         del self.driver_usage[driver]
         self._create_drivers(1)
-        logger.info('Restart host webdriver')
+        logger.info('Restart desktop webdriver')
 
     def restart_driver_mobile(self, driver):
         try:
