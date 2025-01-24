@@ -1,3 +1,4 @@
+
 import logging
 from core.utils import *
 from datetime import datetime
@@ -5,19 +6,29 @@ from datetime import datetime
 
 # UA判定型代码正则
 pattern_list_ua = [
-    re.compile(r'navigator\.useragent\.tolocalelowercase\(\)\.indexof.+document\.title'),
-    re.compile(r'navigator\.useragent\.match\([^()]+\).+document\.title'),
-    re.compile(r'navigator\.useragent\.tolocalelowercase\(\).+document\.title[^<>]', re.DOTALL),
+    #re.compile(r'navigator\.useragent\.tolocalelowercase\(\)\.indexof.+document\.title'),
+    re.compile(r'navigator\.useragent\.match\([^()]+\).+document\.(title|description|keywords)'),
+    re.compile(r'navigator\.useragent\.tolocalelowercase\(\).+document\.title', re.DOTALL),
     re.compile(r'window\.location\.tostring\(\).indexof\([^()]+\).+window\.location\.href'),
     re.compile(r'navigator\.useragent.+includes\([^()]+\).+document\.title'),
     re.compile(r'regexp.+document\.referrer.+window\.location\.href', re.DOTALL),
     re.compile(r'navigator\.useragent\.tolowercase\(\).+document\.title'),
-    re.compile(r'navigator\.useragent\.match\(.+\).+viewport.+hidden.+iframe.+src.+frameborder', re.DOTALL),
-    re.compile(r'i\.test\(navigator\.useragent\).+document\.referrer\.tolowercase.+referrer\.includes.+window\.location\.href', re.DOTALL),
+    re.compile(r'navigator\.useragent.+document\.write.+viewport.+hidden(?=.*src)(?=.*frameborder)(?=.*iframe)', re.DOTALL),
+    # re.compile(r'i\.test\(navigator\.useragent\).+document\.referrer\.tolowercase.+referrer\.includes.+window\.location\.href', re.DOTALL),
+    re.compile(r'i\.test\(navigator\.useragent\).+window\.location\.href', re.DOTALL),
     re.compile(r'document\.referrer.+navigator\.useragent\.tolowercase.+frameborder.+iframe.+viewport', re.DOTALL),
     re.compile(r'navigator\.useragent\.tolowercase.+navigator\.useragent\.match.+document\.referrer\.match.+urlparams\.get.+window\.location\.href', re.DOTALL),
     re.compile(r'document\.title.+navigator\.useragent\.match.+<iframe.+iframe>.+document\.createelement', re.DOTALL),
     re.compile(r'navigator\.useragent\.match.+document\.referrer.+<iframe.+iframe>', re.DOTALL),
+    re.compile(r'navigator\.useragent\.tolowercase.+browser\.indexof.+location\.href', re.DOTALL),
+    re.compile(r'document\.writeln.+script.+document\.referrer.+indexof.+location.href', re.DOTALL),
+    re.compile(r'navigator\.useragent\.match.+location.href', re.DOTALL),
+    re.compile(r'document\.referrer.+navigator\.useragent\.match.+iframe.+document\.body\.children.+document\.createelement', re.DOTALL),
+    # re.compile(r'document\.referrer.+navigator\.useragent\.match.+location.href', re.DOTALL),
+    re.compile(r'window\s*\[\s*["\']document["\']\s*\]\s*\[\s*["\']referrer["\']\s*\].+navigator\s*\[\s*["\']useragent["\']\s*\].+window\s*\[\s*["\']location["\']\s*\]\s*\[\s*["\']href["\']\s*\]', re.DOTALL),
+    re.compile(r'(?=.{100,1500}$)frameborder.+iframe.+document\.body\.children.+style\.display.+document\.createelement.+document\.getelementsbytagname', re.DOTALL),
+    re.compile(r'document\.referrer.+indexof.+window\.location\.href', re.DOTALL),
+    re.compile(r'navigator\.useragent\.match.+document\.referrer.+document\.createelement.+navigator\.useragent\.tolowercase\(\)', re.DOTALL),
 ]
 
 # JS混淆型代码特征
@@ -25,15 +36,19 @@ pattern_list_obf = [
     re.compile(r'parseint\(.+\).+string\.fromcharcode\([^()]+\).+tostring\([^()]+\).+regexp.+(?=.*javascript)(?=.*window)(?=.*document)(?=.*write)'),
     re.compile(r'eval\(function.+parseint.+string\.fromcharcode.+tostring.+replace.+regexp.+window[^<>]+split', re.DOTALL),
     re.compile(r'var.+=\s*string\.fromcharcode\([^()]+\)\s*;\s*document\.write\([^()]+\)', re.DOTALL),
-    re.compile(r'''^\s*window\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\(\s*(['"](\\x[0-9a-f]{2})+['"])\s*\)''', re.DOTALL),
-    re.compile(r'''window\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\(\s*(['"](\\x[0-9a-f]{2})+['"])\s*\).+(android|navigator)''', re.DOTALL),
+    re.compile(r'''window\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\(\s*(['"][^()]+['"])\s*\)''', re.DOTALL),
+    #re.compile(r'''window\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\[\s*(['"](\\x[0-9a-f]{2})+['"])\s*\]\s*\(\s*(['"](\\x[0-9a-f]{2})+['"])\s*\).+(android|navigator)''', re.DOTALL),
     re.compile(r'''\['sojson\.[^']+'\]''', re.DOTALL),
-    re.compile(r'eval.+string\.fromcharcode.+charcodeat\([^()]+\)'),
-    re.compile(r'function.+math\.random.+charat.+document.createelement.+appendchild'),
+    re.compile(r'eval.+string\.fromcharcode\(\w+\.charcodeat\([^()]+\)'),
+    re.compile(r'(?=.{100,1000}$)function.+math\.random.+charat.+document.createelement.+appendchild'),  # 增加匹配长度限制，避免匹配百度的某些脚本
     re.compile(r'jsjiami\.com\.v7'),
     re.compile(r'eval\(.+\).+tostring\([^()]+\).+replace.+regexp.+(?=.*script)(?=.*js)(?=.*document)(?=.*write)'),
+    re.compile(r'var.+string\.fromcharcode\([^()]+\).+eval\([^()]+\)'),
+    re.compile(r'document\.write\(string\.fromcharcode\([^()]+\)\)'),
+    re.compile(r'function\s+[_a-zA-Z0-9]+\(\)\s*\{\s*var\s+[_a-zA-Z0-9]+.+parseint.+window\[\'location\'\]', re.DOTALL),
+    re.compile(r'document\.write\(atob\([^()]+\)', re.DOTALL),
+    re.compile(r"""var\s+_0x[a-f0-9]+\s*=.+function\s+_0x[a-f0-9]+.+window\s*\[\s*['"]location['"]\s*\]""", re.DOTALL),
 ]
-
 logger = logging.getLogger(__name__)
 
 
@@ -46,6 +61,7 @@ def detect(queue_data, config):
     file_ip_data = config.get("file_ip_data")
     ip_data_url = config.get("ip_data_url")
     file_output = config["file_output"]
+    desktop_mobile_similarity_ratio = config["desktop_mobile_similarity_ratio"]
 
     # 加载样本字典
     sample_dict = load_sample_dict(sample_file_path)
@@ -117,8 +133,9 @@ def detect(queue_data, config):
         tampering_code = []
         tampering_js_urls = []
         tampering_js_patterns = []
-        max_line, max_similarity, max_sample = '', 0.0, ''
-
+        max_line_meta, max_similarity_meta, max_sample_meta = '', 0.0, ''
+        max_line_body, max_similarity_body, max_sample_body = '', 0.0, ''
+        is_exact_match = False
         logger.info(f'Detect website {domain}')
 
         # 提取页面文本信息
@@ -149,11 +166,15 @@ def detect(queue_data, config):
 
         # 判断是否存在被植入的JS文件，可能存在多个
         for js_url, js_content in set(js_file_list):
+            if js_url in tampering_js_urls:
+                continue
+            logger.debug(f'Detect JS file {js_url} content {js_content[:100]}')
             for pattern in pattern_list_obf + pattern_list_ua:
-                search_result = partial_match(pattern, js_content)
+                search_result = partial_match(pattern, js_content.lower())
                 if search_result:
                     tampering_js_urls.append(js_url)
                     tampering_js_patterns.append(str(pattern))
+                    logger.debug(f'{js_url} match pattern {pattern}')
                     break
 
         # PC端和移动端UA打开的页面最终域名是否相同
@@ -166,19 +187,23 @@ def detect(queue_data, config):
         text_mobile = '\n'.join(filter(None, [title_mobile, keywords_mobile, description_mobile, body_text_mobile]))
 
         # 判断title, keywords, description是否与篡改样本相似，并且与body中文本的相似度较低
-        title_line, title_similarity, title_sample = text_sample_similarity(
+        title_line, title_similarity, title_sample, has_same_text = text_sample_similarity(
             '\n'.join(filter(None, [title, title_mobile])), sample_dict, target_similarity=1.0)
-        if title_similarity > max_similarity:
-            max_line, max_similarity, max_sample = title_line, title_similarity, title_sample
+        if title_similarity > max_similarity_meta:
+            max_line_meta, max_similarity_meta, max_sample_meta = title_line, title_similarity, title_sample
+        if not is_exact_match and has_same_text:
+            is_exact_match = True
 
         is_title_abnormal = title_similarity >= sample_similarity_ratio
 
-        meta_line, meta_similarity, meta_sample = text_sample_similarity(
+        meta_line, meta_similarity, meta_sample, has_same_text = text_sample_similarity(
             '\n'.join(filter(None, [keywords, description, keywords_mobile, description_mobile])),
             sample_dict,
             target_similarity=1.0)
-        if meta_similarity > max_similarity:
-            max_line, max_similarity, max_sample = meta_line, meta_similarity, meta_sample
+        if meta_similarity > max_similarity_meta:
+            max_line_meta, max_similarity_meta, max_sample_meta = meta_line, meta_similarity, meta_sample
+        if not is_exact_match and has_same_text:
+            is_exact_match = True
 
         is_meta_abnormal = meta_similarity >= sample_similarity_ratio
 
@@ -186,12 +211,14 @@ def detect(queue_data, config):
         if is_title_abnormal and is_meta_abnormal:
             body_line, body_similarity, body_sample = '', 0.0, ''
         else:
-            body_line, body_similarity, body_sample = text_sample_similarity(
+            body_line, body_similarity, body_sample, has_same_text = text_sample_similarity(
                 '\n'.join(filter(None, [body_text, body_text_mobile])),
                 sample_dict,
-                target_similarity=sample_similarity_ratio)
-        if body_similarity > max_similarity:
-            max_line, max_similarity, max_sample = body_line, body_similarity, body_sample
+                target_similarity=1.0)
+        if body_similarity > max_similarity_body:
+            max_line_body, max_similarity_body, max_sample_body = body_line, body_similarity, body_sample
+        if not is_exact_match and has_same_text:
+            is_exact_match = True
 
         is_body_abnormal = body_similarity >= sample_similarity_ratio
 
@@ -210,18 +237,26 @@ def detect(queue_data, config):
         # 5.title中存在和篡改样本相似的文本
         # 6.keywords, description中存在和篡改样本相似的文本
         # 7.body中存在和篡改样本相似的文本
-        # 8.命中的相似样本长度超过阈值
+        # 8.meta信息中命中的相似样本长度超过阈值
+        # 9.存在和样本完全一致的文本
         if sum([1 for flag in [
             is_pattern_match_js,
             is_pattern_match_ua,
             tampering_js_urls,
-            not is_final_url_same and final_url != url_blank and final_url_mobile != url_blank,
+            not is_final_url_same and final_url != url_blank and final_url_mobile != url_blank
+            and similarity_desktop_mobile < desktop_mobile_similarity_ratio,
             is_title_abnormal,
             is_meta_abnormal,
             is_body_abnormal,
-            max_similarity >= sample_similarity_ratio and len(max_sample) >= 10
+            max_similarity_meta >= sample_similarity_ratio and len(max_sample_meta) >= 10,
+            is_exact_match,
         ] if flag]) >= 2:
             is_tampered = True
+
+        if max_similarity_meta >= max_similarity_body:
+            max_line, max_similarity, max_sample = max_line_meta, max_similarity_meta, max_sample_meta
+        else:
+            max_line, max_similarity, max_sample = max_line_body, max_similarity_body, max_sample_body
 
         logger.info(f'\n'
                     f'{domain} is tampered: {is_tampered}\n'
@@ -233,7 +268,8 @@ def detect(queue_data, config):
                     f'is_meta_abnormal: {is_meta_abnormal}\n'
                     f'is_body_abnormal: {is_body_abnormal}\n'
                     f'max_similarity: {max_similarity}\n'
-                    f'max_sample_length: {len(max_sample)}')
+                    f'max_sample_length: {len(max_sample)}\n'
+                    f'is_exact_match: {is_exact_match}')
 
         # 输出结果
         output_data = [domain,  # 域名
@@ -248,8 +284,8 @@ def detect(queue_data, config):
                        similarity_desktop_mobile,  # 不同UA页面文本的相似度
                        '是' if is_tampered else '否',  # 是否符合篡改特征
                        '\n\n'.join(tampering_code) if is_tampered else '',  # 疑似篡改代码
-                       '\n'.join(tampering_js_urls),  # 疑似植入的JS链接
-                       '\n'.join(tampering_js_patterns),  # 疑似植入的JS链接命中正则
+                       '\n\n'.join(tampering_js_urls),  # 疑似植入的JS链接
+                       '\n\n'.join(tampering_js_patterns),  # 疑似植入的JS链接命中正则
                        max_line,  # 与样本相似的文本
                        max_similarity,  # 与样本的相似度
                        max_sample,]  # 命中的原始样本

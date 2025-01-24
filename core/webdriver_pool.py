@@ -64,6 +64,11 @@ class WebDriverPool:
                                       service=chrome_service,
                                       keep_alive=True)
             driver.set_page_load_timeout(self.config.get("max_wait_time"))
+            # 启用网络功能
+            driver.execute_cdp_cmd('Network.enable', {})
+
+            # 提高 DevTools 的缓冲区大小，减少日志丢失
+            driver.execute_cdp_cmd("Performance.setTimeDomain", {"timeDomain": "threadTicks"})
             self.drivers.put(driver)
             self.driver_usage[driver] = 0
         logging.info(f'Create {num} desktop webdriver')
@@ -118,6 +123,9 @@ class WebDriverPool:
 
             # 启用网络功能
             driver.execute_cdp_cmd('Network.enable', {})
+
+            # 提高 DevTools 的缓冲区大小，减少日志丢失
+            driver.execute_cdp_cmd("Performance.setTimeDomain", {"timeDomain": "threadTicks"})
 
             driver.set_page_load_timeout(self.config.get("max_wait_time"))
 

@@ -308,7 +308,7 @@ def compute_similarity(text1, text2):
     return round(similarity[0][0], 2)
 
 
-def partial_match(pattern, text, max_length=20000, slice_length=10000):
+def partial_match(pattern, text, max_length=4000, slice_length=2000):
     """
     如果字符串长度超过一定长度，则针对字符串的开头和结尾进行正则表达式匹配，避免直接对超长文本进行匹配，导致耗时过长。
 
@@ -331,7 +331,7 @@ def partial_match(pattern, text, max_length=20000, slice_length=10000):
             search_result = pattern.search(end_text)
     else:
         # 如果长度不超过 max_length，对整个字符串进行匹配
-        search_result = re.findall(pattern, text)
+        search_result = pattern.search(text)
 
     return search_result
 
@@ -344,10 +344,10 @@ def remove_control_characters(value):
     return value
 
 
-def sliding_window_similarity(target, sample, sample_tokenized,
+def sliding_window_similarity(target_text, sample, sample_tokenized,
                               target_similarity=1.0, step=5, split_to_single_char=False):
     """使用滑动窗口计算目标文本和样本的相似度"""
-    target_length = len(target)
+    target_length = len(target_text)
     sample_length = len(sample)
     window_size = sample_length
     max_window_similarity = 0.0
@@ -371,7 +371,7 @@ def sliding_window_similarity(target, sample, sample_tokenized,
 
     # 从文本开头开始滑动
     for i in sliding_range:
-        window_text = target[i:i + window_size]
+        window_text = target_text[i:i + window_size]
 
         if split_to_single_char:
             # 拆分成单个词
@@ -400,8 +400,11 @@ def sliding_window_similarity(target, sample, sample_tokenized,
 def text_sample_similarity(text, sample_dict, min_length=8, max_length=200, target_similarity=1.0):
     """计算网页文本和样本的相似度"""
     max_similarity = 0.0
+    similarity = 0.0
     max_line = ''
     max_sample = ''
+    has_same_text = False
+    target_similarity_achieved = False
     for line in text.split('\n'):
         line = line.strip().lower()[:max_length]
         text_length = len(line)
@@ -411,15 +414,24 @@ def text_sample_similarity(text, sample_dict, min_length=8, max_length=200, targ
             if not all(keyword in line for keyword in keywords):
                 continue
             for text_sample, sample_tokenized in sample_dict[keywords]:
-                similarity, text = sliding_window_similarity(
-                    line, text_sample, sample_tokenized, target_similarity=target_similarity)
+                # 判断目标文本中是否存在和样本完全一致的文本
+                if text_sample in line:
+                    similarity = 1.0
+                    has_same_text = True
+                    return line, similarity, text_sample, has_same_text
+                # 否则使用滑动窗口进行匹配
+                # 如果目标相似度已经达到，则不再继续相似度计算，仅判断是否存在与样本相同的文本
+                elif not target_similarity_achieved:
+                    similarity, _ = sliding_window_similarity(
+                        line, text_sample, sample_tokenized, target_similarity=target_similarity)
                 if similarity > max_similarity:
                     max_similarity = similarity
                     max_sample = text_sample
                     max_line = line
-                if max_similarity > target_similarity:
-                    return max_line, max_similarity, max_sample
-    return max_line, max_similarity, max_sample
+                if max_similarity >= target_similarity:
+                    target_similarity_achieved = True
+
+    return max_line, max_similarity, max_sample, has_same_text
 
 
 def load_sample_dict(file_path, sheet_name='Sheet1'):

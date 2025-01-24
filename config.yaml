@@ -12,7 +12,7 @@ file_ip_data: "data/china_ip_list.txt"  # 中国大陆境内IP数据文件
 ip_data_url: "https://raw.githubusercontent.com/17mon/china_ip_list/master/china_ip_list.txt"  # 中国大陆境内IP数据文件下载地址
 sample_file_path: "data/sample.xlsx"
 sample_similarity_ratio: 0.65  # Meta信息与样本的相似度阈值
-text_similarity_ratio: 0.1 # 判定Meta和Body的内容相似度阈值
+desktop_mobile_similarity_ratio: 0.2 # 判定PC端和移动端页面相似度阈值
 webdriver_max_usage: 500  # webdriver爬取一定次数后进行重启的阈值
 crawler_user_agent_desktop: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36; Baiduspider/2.0"
 crawler_user_agent_mobile: "Mozilla/5.0 (Linux; Android 10; iPhone OS 14_0 like Mac OS X) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Mobile Safari/537.36"
