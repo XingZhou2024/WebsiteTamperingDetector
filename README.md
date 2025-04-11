@@ -17,32 +17,41 @@
 2. python3 main.py
 3. 检测完成后结果将输出到output.xlsx文件中
 
-## 支持检测的篡改特征
+## 实现思路
 
-- UA判定型JS代码
-1. 类型一<br>![image](images/UA-1.png)
-2. 类型二<br>![image](images/UA-2.png)
-3. 类型三<br>![image](images/UA-3.png)
-4. 类型四<br>![image](images/UA-4.png)
-5. 类型五<br>![image](images/UA-5.png)
-6. 类型六<br>![image](images/UA-6.png)
+从行为、文本、代码三个层面入手，检测目标网站是否遭到篡改。
+检测过程中使用Selenium控制Chrome浏览器访问目标网站，以实现页面内容的完整加载， 同时便于对加载的JavaScript文件进行分析。  
+通过整合行为、文本、代码三个层面的检测结果，可以综合判断目标网站是否被篡改。一般来说，命中检测规则的数量越多，网站被篡改的可能性越高。
 
-- 代码混淆型JS代码
-1. 类型一<br>![image](images/JS-1.png)
-2. 类型二<br>![image](images/JS-2.png)
-3. 类型三<br>![image](images/JS-3.png)
-4. 类型四<br>![image](images/JS-4.png)
-5. 类型五<br>![image](images/JS-5.png)
-6. 类型六<br>![image](images/JS-6.png)
-7. 类型七<br>![image](images/JS-7.png)
-8. 类型八<br>![image](images/JS-8.png)
-9. 类型九<br>![image](images/JS-9.png)
+- 行为层面
+1. 终端环境对比分析<br>
+使用PC和移动端两种User-Agent分别访问目标网站，分析两种环境下获取的页面内容和JavaScript代码。
+记录两种访问方式下最终打开页面的URL，并比较页面文本的相似度，从而判断是否存在基于终端设备的跳转行为或内容差异。
+在PC端的User-Agent中增加百度爬虫相关信息以便获取针对搜索引擎爬虫展示的内容。
 
-- 特定结构HTML代码
-1. 类型一<br>![image](images/HTML-1.png)
-2. 类型二<br>![image](images/HTML-2.png)
-3. 类型三<br>![image](images/HTML-3.png)
-4. 类型四<br>![image](images/HTML-4.png)
+2. Referer字段测试<br>
+在访问目标网站时指定Referer字段为baidu.com，应对根据访问是否源自搜索引擎结果来控制跳转或内容展示的情况，从而检测与Referer相关的篡改行为。
+
+- 文本层面
+1. Unicode自动转码分析<br>
+Chrome浏览器会自动将Unicode编码的文本转码为明文，因此可以直接分析加载后页面中的可见文本内容，避免手动解码的复杂性。
+
+2. 全面文本提取与对比<br>
+提取页面上的所有文本内容，包括meta信息和样式属性设置为隐藏的元素节点。将提取的文本与已收集的篡改文本样本进行相似度比对，判断页面是否包含异常文本内容。
+
+3. 滑动窗口匹配检测<br>
+针对篡改内容与正常文本混杂的情况，根据篡改文本样本的长度，使用滑动窗口算法逐段匹配页面文本，精确定位潜在的篡改内容。
+
+- 代码层面
+1. 特征规则总结<br>
+分析已知被篡改网站的代码特征，提取并总结攻击者常用的代码模式，形成可用于检测的正则表达式。目前主要包括基于User-Agent和Referer的判断逻辑与使用混淆技术隐藏代码两大类型。
+
+2. 内嵌JavaScript检测<br>
+提取网站HTML中的所有内嵌JavaScript代码，逐段匹配上述正则表达式，判断是否存在篡改代码片段。
+
+3. 外部JavaScript检测<br>
+提取浏览器加载过程中涉及的所有JavaScript文件及其URL，对文件内容应用篡改代码正则进行检测。对于命中的文件，记录对应的加载URL，以便进一步分析其来源和潜在危害。
+
 
 ## 准确率
 
