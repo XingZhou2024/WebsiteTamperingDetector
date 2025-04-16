@@ -223,6 +223,8 @@ def fetch_js_content(url, max_retries=3, timeout=5):
 
 def get_main_domain(url_or_domain):
     """提取URL或域名的主域名"""
+    if not url_or_domain:
+        return ''
     # 使用tldextract来分解域名或URL
     extracted = tldextract.extract(url_or_domain)
     # 组合主域名和顶级域名
@@ -231,6 +233,8 @@ def get_main_domain(url_or_domain):
 
 def compare_main_domains(url_or_domain1, url_or_domain2):
     """比较两个URL或域名的主域名是否一致"""
+    if not url_or_domain1 or not url_or_domain2:
+        return False
     main_domain1 = get_main_domain(url_or_domain1)
     main_domain2 = get_main_domain(url_or_domain2)
     return main_domain1 == main_domain2
